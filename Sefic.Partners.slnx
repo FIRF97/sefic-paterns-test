@@ -1,8 +1,0 @@
-<Solution>
-  <Project Path="Sefic.Partners.Api/Sefic.Partners.Api.csproj" />
-  <Project Path="Sefic.Partners.Core/Sefic.Partners.Core.csproj" />
-  <Project Path="Sefic.Partners.Data/Sefic.Partners.Data.csproj" />
-  <Project Path="Sefic.Partners.Services/Sefic.Partners.Services.csproj" />
-  <Project Path="Sefic.Partners.Shared/Sefic.Partners.Shared.csproj" />
-  <Project Path="Sefic.Partners.Tests/Sefic.Partners.Tests.csproj" />
-</Solution>
