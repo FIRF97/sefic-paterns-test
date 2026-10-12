@@ -38,6 +38,9 @@ app.UseSwaggerUI(c =>
 app.UseRouting();
 app.UseCors("DefaultCors");
 
+// Redirecionar rota raiz diretamente para o Swagger
+app.MapGet("/", () => Results.Redirect("/swagger"));
+
 app.MapControllers();
 
 app.Run();
