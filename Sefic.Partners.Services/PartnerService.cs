@@ -1,9 +1,9 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using Sefic.Partners.Data.Context;
 using Sefic.Partners.Services.DTO;
 using Sefic.Partners.Services.Helper;
 using Sefic.Partners.Services.Interface;
+using Sefic.Partners.Shared.Context;
 using Sefic.Partners.Shared.Enums;
 using Sefic.Partners.Shared.Model;
 using Sefic.Partners.Shared.Models;

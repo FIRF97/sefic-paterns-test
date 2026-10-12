@@ -3,10 +3,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Sefic.Partners.Core;
 using Sefic.Partners.Data;
-using Sefic.Partners.Data.Context;
 using Sefic.Partners.Services;
 using Sefic.Partners.Services.Interface;
 using Sefic.Partners.Shared;
+using Sefic.Partners.Shared.Context;
 using Sefic.Partners.Shared.Interface;
 using Sefic.Partners.Shared.Models;
 

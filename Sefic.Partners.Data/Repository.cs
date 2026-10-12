@@ -1,6 +1,6 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
-using Sefic.Partners.Data.Context;
+using Sefic.Partners.Shared.Context;
 using Sefic.Partners.Shared.Interface;
 
 namespace Sefic.Partners.Data;

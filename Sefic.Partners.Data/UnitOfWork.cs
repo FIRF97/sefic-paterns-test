@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Sefic.Partners.Core;
-using Sefic.Partners.Data.Context;
+using Sefic.Partners.Shared.Context;
 using Sefic.Partners.Shared.Interface;
 using Sefic.Partners.Shared.Model;
 

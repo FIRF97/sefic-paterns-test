@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Sefic.Partners.Shared.Enums;
 using Sefic.Partners.Shared.Model;
 
-namespace Sefic.Partners.Data.Context;
+namespace Sefic.Partners.Shared.Context;
 
 public class PartnersDbContext : DbContext
 {
