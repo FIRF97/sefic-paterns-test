@@ -20,6 +20,24 @@ public class PartnersScenarioTests : IClassFixture<CustomWebApplicationFactory>
         _client = factory.CreateClient();
     }
 
+    [Fact]
+    public async Task CheckSwaggerJson()
+    {
+        var res = await _client.GetAsync("/swagger/v1/swagger.json");
+        var str = await res.Content.ReadAsStringAsync();
+        Assert.True(res.IsSuccessStatusCode, $"Status: {res.StatusCode}");
+        Assert.Contains("\"openapi\": \"3.0.1\"", str);
+    }
+
+    [Fact]
+    public async Task CheckSwaggerIndexHtml()
+    {
+        var res = await _client.GetAsync("/swagger/index.html");
+        Assert.True(res.IsSuccessStatusCode, $"Status: {res.StatusCode}");
+        var html = await res.Content.ReadAsStringAsync();
+        Assert.Contains("swagger-ui", html);
+    }
+
     /// <summary>
     /// Cenário 1:
     /// Criar cliente com Name=" Ana Silva " e NIF "001.234.567": guardar "Ana Silva" e "001234567".

@@ -27,6 +27,36 @@ app.Use(async (context, next) =>
     await next();
 });
 
+app.UseCors("DefaultCors");
+
+// Compatibilidade do Swagger UI com OpenAPI (reescreve 3.0.4 para 3.0.1 suportado pelo regex do Swagger UI)
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.Value != null && context.Request.Path.Value.EndsWith("swagger.json", StringComparison.OrdinalIgnoreCase))
+    {
+        var originalBody = context.Response.Body;
+        using var memStream = new MemoryStream();
+        context.Response.Body = memStream;
+
+        await next();
+
+        memStream.Position = 0;
+        using var reader = new StreamReader(memStream);
+        string responseBody = await reader.ReadToEndAsync();
+
+        responseBody = responseBody.Replace("\"openapi\": \"3.0.4\"", "\"openapi\": \"3.0.1\"")
+                                   .Replace("\"openapi\":\"3.0.4\"", "\"openapi\":\"3.0.1\"");
+
+        context.Response.Body = originalBody;
+        var bytes = System.Text.Encoding.UTF8.GetBytes(responseBody);
+        context.Response.ContentLength = bytes.Length;
+        await context.Response.Body.WriteAsync(bytes);
+        return;
+    }
+
+    await next();
+});
+
 // Swagger sempre acessível para testes e documentação
 app.UseSwagger();
 app.UseSwaggerUI(c =>
