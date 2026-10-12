@@ -1,0 +1,156 @@
+### Sefic Partners API - Exemplos de Requisições HTTP
+
+@baseUrl = http://localhost:8080/api/partners
+
+### 1. Criar Cliente (POST /api/partners) - Sucesso 201
+# Note que os espaços e pontos no NIF e no Nome serão normalizados pelo servidor
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+  "name": " Ana Silva ",
+  "taxNumber": "001.234.567",
+  "type": "CUSTOMER",
+  "email": "ana.silva@example.com",
+  "creditLimit": 5000.00
+}
+
+### 2. Criar Fornecedor (POST /api/partners) - Sucesso 201
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+  "name": "Tech Supplies Lda",
+  "taxNumber": "502-123-456",
+  "type": "SUPPLIER",
+  "email": "contacto@techsupplies.com",
+  "creditLimit": 50000.00
+}
+
+### 3. Criar Entidade Mista (BOTH) - Sucesso 201
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+  "name": "Global Logística & Distribuição",
+  "taxNumber": "509988776",
+  "type": "BOTH",
+  "email": "geral@globallog.com",
+  "creditLimit": 120000.00
+}
+
+### 4. Obter Parceiro por Id (GET /api/partners/{id}) - Sucesso 200
+# Substitua pelo GUID retornado na criação
+@partnerId = 00000000-0000-0000-0000-000000000000
+GET {{baseUrl}}/{{partnerId}}
+
+### 5. Listar Parceiros - Todos com Paginação por Defeito (Page=1, PageSize=20, IncludeInactive=false)
+GET {{baseUrl}}
+
+### 6. Listar Parceiros com Filtro por Nome ou NIF (Search="Ana")
+GET {{baseUrl}}?search=Ana
+
+### 7. Listar Parceiros com Filtro por Tipo CUSTOMER (inclui CUSTOMER e BOTH)
+GET {{baseUrl}}?type=CUSTOMER
+
+### 8. Listar Parceiros com Filtro por Tipo SUPPLIER (inclui SUPPLIER e BOTH)
+GET {{baseUrl}}?type=SUPPLIER
+
+### 9. Listar Parceiros com Filtro por Tipo BOTH (apenas BOTH)
+GET {{baseUrl}}?type=BOTH
+
+### 10. Listar Parceiros Incluindo Inativos
+GET {{baseUrl}}?includeInactive=true
+
+### 11. Listar Parceiros com Paginação Personalizada (Page=1, PageSize=2)
+GET {{baseUrl}}?page=1&pageSize=2
+
+### 12. Atualizar Parceiro (PUT /api/partners/{id}) - Sucesso 200
+# Substitua o Id e o token de Version correspondente retornado no GET/POST
+PUT {{baseUrl}}/{{partnerId}}
+Content-Type: application/json
+
+{
+  "name": "Ana Silva Atualizada",
+  "taxNumber": "001234567",
+  "type": "CUSTOMER",
+  "email": "ana.nova@example.com",
+  "creditLimit": 7500.00,
+  "isActive": true,
+  "version": "AAAAAAAAB9Q="
+}
+
+### 13. Desativar Parceiro via PUT (IsActive=false)
+PUT {{baseUrl}}/{{partnerId}}
+Content-Type: application/json
+
+{
+  "name": "Ana Silva Atualizada",
+  "taxNumber": "001234567",
+  "type": "CUSTOMER",
+  "email": "ana.nova@example.com",
+  "creditLimit": 7500.00,
+  "isActive": false,
+  "version": "AAAAAAAAB9U="
+}
+
+# ========================================================
+# CENÁRIOS DE ERRO E VALIDAÇÃO
+# ========================================================
+
+### 14. Erro 409: NIF Duplicado (Tentativa de recriar o mesmo NIF em formato diferente)
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+  "name": "Tentativa Duplicada",
+  "taxNumber": "001 234 567",
+  "type": "CUSTOMER",
+  "email": "duplicado@example.com",
+  "creditLimit": 1000.00
+}
+
+### 15. Erro 400: Limite de Crédito com Precisão Excessiva (10.999)
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+  "name": "Cliente Invalido",
+  "taxNumber": "999888777",
+  "type": "CUSTOMER",
+  "email": "invalido@example.com",
+  "creditLimit": 10.999
+}
+
+### 16. Erro 400: NIF com Letras
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+  "name": "Cliente Letras",
+  "taxNumber": "12345678A",
+  "type": "CUSTOMER",
+  "creditLimit": 1000.00
+}
+
+### 17. Erro 400: Paginação Inválida (Page = 0)
+GET {{baseUrl}}?page=0
+
+### 18. Erro 400: Tipo Inválido
+GET {{baseUrl}}?type=TIPO_INEXISTENTE
+
+### 19. Erro 404: Id Inexistente
+GET {{baseUrl}}/ffffffff-ffff-ffff-ffff-ffffffffffff
+
+### 20. Erro 400: Version Malformada no PUT
+PUT {{baseUrl}}/{{partnerId}}
+Content-Type: application/json
+
+{
+  "name": "Teste Version",
+  "taxNumber": "001234567",
+  "type": "CUSTOMER",
+  "creditLimit": 1000.00,
+  "isActive": true,
+  "version": "formato-invalido-de-base64!!"
+}

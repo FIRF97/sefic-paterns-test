@@ -1,0 +1,22 @@
+## [Visual Studio / .NET]
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## [Test Results]
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+
+## [Docker]
+.docker/
+
+## [OS generated files]
+.DS_Store
+Thumbs.db

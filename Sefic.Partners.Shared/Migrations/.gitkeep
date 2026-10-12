@@ -1,0 +1,3 @@
+# As migrações do EF Core ficarão nesta pasta (Sefic.Partners.Shared/Migrations)
+# Conforme solicitado, as migrações serão geradas pelo desenvolvedor utilizando:
+# dotnet ef migrations add InitialCreate --project Sefic.Partners.Shared --startup-project Sefic.Partners.Api
