@@ -80,15 +80,30 @@ public class PartnerService : IPartnerService
         return ServiceResult<PartnerResponseDto>.Success(PartnerResponseDto.FromEntity(entity));
     }
 
-    public async Task<ServiceResult<PagedResult<PartnerResponseDto>>> GetAllAsync(PageFilter filter)
+    public Task<ServiceResult<PagedResult<PartnerResponseDto>>> GetAllAsync(PageFilter filter)
     {
-        if (!PartnerValidator.ValidatePagination(filter.Page, filter.PageSize, out var paginationError))
+        if (filter is PartnerFiltro pf)
+            return GetAllAsync(pf);
+
+        return GetAllAsync(new PartnerFiltro
+        {
+            Page = filter.Page,
+            PageSize = filter.PageSize,
+            Search = filter.Search,
+            Type = filter.Type,
+            IncludeInactive = filter.IncludeInactive
+        });
+    }
+
+    public async Task<ServiceResult<PagedResult<PartnerResponseDto>>> GetAllAsync(PartnerFiltro filtro)
+    {
+        if (!PartnerValidator.ValidatePagination(filtro.Page, filtro.PageSize, out var paginationError))
             return ServiceResult<PagedResult<PartnerResponseDto>>.BadRequest(paginationError!);
 
         PartnerType? filterType = null;
-        if (!string.IsNullOrWhiteSpace(filter.Type))
+        if (!string.IsNullOrWhiteSpace(filtro.Type))
         {
-            if (Enum.TryParse<PartnerType>(filter.Type.Trim(), true, out var parsedType))
+            if (Enum.TryParse<PartnerType>(filtro.Type.Trim(), true, out var parsedType))
             {
                 filterType = parsedType;
             }
@@ -100,13 +115,23 @@ public class PartnerService : IPartnerService
 
         IQueryable<Partner> query = _context.Partners.AsNoTracking();
 
-        // IncludeInactive (false por defeito)
-        if (!filter.IncludeInactive)
+        // 1. Filtro por Id
+        if (filtro.Id.HasValue && filtro.Id.Value != Guid.Empty)
+        {
+            query = query.Where(p => p.Id == filtro.Id.Value);
+        }
+
+        // 2. Filtro IsActive / IncludeInactive
+        if (filtro.IsActive.HasValue)
+        {
+            query = query.Where(p => p.IsActive == filtro.IsActive.Value);
+        }
+        else if (!filtro.IncludeInactive)
         {
             query = query.Where(p => p.IsActive);
         }
 
-        // Filtro por Type:
+        // 3. Filtro por Type:
         // CUSTOMER inclui CUSTOMER e BOTH
         // SUPPLIER inclui SUPPLIER e BOTH
         // BOTH inclui apenas BOTH
@@ -121,13 +146,80 @@ public class PartnerService : IPartnerService
             };
         }
 
-        // Filtro Search:
-        // Ocorrência parcial no nome (sem case sensitivity) ou no NIF normalizado.
-        // Não use uma procura normalizada vazia para fazer todos os NIF corresponderem.
-        // Search="Ana" não pode corresponder todas as entidades pelo ramo do NIF.
-        if (!string.IsNullOrWhiteSpace(filter.Search))
+        // 4. Filtro específico por Nome
+        if (!string.IsNullOrWhiteSpace(filtro.Name))
         {
-            var searchTrimmed = filter.Search.Trim();
+            var nameTrimmed = filtro.Name.Trim();
+            query = query.Where(p => EF.Functions.Like(p.Name, $"%{nameTrimmed}%"));
+        }
+
+        // 5. Filtro específico por NIF (TaxNumber)
+        if (!string.IsNullOrWhiteSpace(filtro.TaxNumber))
+        {
+            var nifNormalized = TaxNumberHelper.Normalize(filtro.TaxNumber);
+            if (!string.IsNullOrWhiteSpace(nifNormalized))
+            {
+                query = query.Where(p => p.TaxNumber.Contains(nifNormalized));
+            }
+        }
+
+        // 6. Filtro específico por Email
+        if (!string.IsNullOrWhiteSpace(filtro.Email))
+        {
+            var emailTrimmed = filtro.Email.Trim();
+            query = query.Where(p => p.Email != null && EF.Functions.Like(p.Email, $"%{emailTrimmed}%"));
+        }
+
+        // 7. Filtro por CreditLimit (exato ou intervalo)
+        if (filtro.CreditLimit.HasValue)
+        {
+            query = query.Where(p => p.CreditLimit == filtro.CreditLimit.Value);
+        }
+        if (filtro.MinCreditLimit.HasValue)
+        {
+            query = query.Where(p => p.CreditLimit >= filtro.MinCreditLimit.Value);
+        }
+        if (filtro.MaxCreditLimit.HasValue)
+        {
+            query = query.Where(p => p.CreditLimit <= filtro.MaxCreditLimit.Value);
+        }
+
+        // 8. Filtro por Data de Registo (CreatedAt)
+        if (filtro.CreatedAt.HasValue)
+        {
+            var targetDate = filtro.CreatedAt.Value.Date;
+            var nextDay = targetDate.AddDays(1);
+            query = query.Where(p => p.CreatedAt >= targetDate && p.CreatedAt < nextDay);
+        }
+        if (filtro.CreatedAtFrom.HasValue)
+        {
+            query = query.Where(p => p.CreatedAt >= filtro.CreatedAtFrom.Value);
+        }
+        if (filtro.CreatedAtTo.HasValue)
+        {
+            query = query.Where(p => p.CreatedAt <= filtro.CreatedAtTo.Value);
+        }
+
+        // 9. Filtro por Data de Atualização (UpdatedAt)
+        if (filtro.UpdatedAt.HasValue)
+        {
+            var targetDate = filtro.UpdatedAt.Value.Date;
+            var nextDay = targetDate.AddDays(1);
+            query = query.Where(p => p.UpdatedAt >= targetDate && p.UpdatedAt < nextDay);
+        }
+        if (filtro.UpdatedAtFrom.HasValue)
+        {
+            query = query.Where(p => p.UpdatedAt >= filtro.UpdatedAtFrom.Value);
+        }
+        if (filtro.UpdatedAtTo.HasValue)
+        {
+            query = query.Where(p => p.UpdatedAt <= filtro.UpdatedAtTo.Value);
+        }
+
+        // 10. Filtro Search (busca global por nome ou NIF):
+        if (!string.IsNullOrWhiteSpace(filtro.Search))
+        {
+            var searchTrimmed = filtro.Search.Trim();
             var searchNifNormalized = TaxNumberHelper.Normalize(searchTrimmed);
 
             if (searchNifNormalized.Length > 0 && searchNifNormalized.Any(char.IsDigit))
@@ -140,19 +232,41 @@ public class PartnerService : IPartnerService
             }
         }
 
-        // Ordene por Name e depois Id, conte antes de paginar e execute filtros/paginação no SQL Server
-        query = query.OrderBy(p => p.Name).ThenBy(p => p.Id);
+        // 11. Ordenação mediante a data de registo (CreatedAt) ou padrão por Name
+        bool isDescending = filtro.OrderByDescending ??
+            (string.Equals(filtro.SortDirection, "desc", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(filtro.SortDirection, "decrescente", StringComparison.OrdinalIgnoreCase));
+
+        bool isAscending = (filtro.OrderByDescending == false) ||
+            (string.Equals(filtro.SortDirection, "asc", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(filtro.SortDirection, "crescente", StringComparison.OrdinalIgnoreCase));
+
+        bool sortByCreatedAt = isDescending || isAscending ||
+            string.Equals(filtro.OrderBy, "CreatedAt", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(filtro.OrderBy, "DataRegisto", StringComparison.OrdinalIgnoreCase);
+
+        if (sortByCreatedAt)
+        {
+            query = isDescending
+                ? query.OrderByDescending(p => p.CreatedAt).ThenBy(p => p.Id)
+                : query.OrderBy(p => p.CreatedAt).ThenBy(p => p.Id);
+        }
+        else
+        {
+            // Ordenação padrão da especificação original: Name e depois Id
+            query = query.OrderBy(p => p.Name).ThenBy(p => p.Id);
+        }
 
         var totalCount = await query.CountAsync();
 
         var items = await query
-            .Skip((filter.Page - 1) * filter.PageSize)
-            .Take(filter.PageSize)
+            .Skip((filtro.Page - 1) * filtro.PageSize)
+            .Take(filtro.PageSize)
             .ToListAsync();
 
         var dtos = items.Select(PartnerResponseDto.FromEntity).ToList();
 
-        var pagedResult = new PagedResult<PartnerResponseDto>(dtos, totalCount, filter.Page, filter.PageSize);
+        var pagedResult = new PagedResult<PartnerResponseDto>(dtos, totalCount, filtro.Page, filtro.PageSize);
         return ServiceResult<PagedResult<PartnerResponseDto>>.Success(pagedResult);
     }
 

@@ -65,7 +65,29 @@ GET {{baseUrl}}?includeInactive=true
 ### 11. Listar Parceiros com Paginação Personalizada (Page=1, PageSize=2)
 GET {{baseUrl}}?page=1&pageSize=2
 
-### 12. Atualizar Parceiro (PUT /api/partners/{id}) - Sucesso 200
+# ========================================================
+# FILTROS AVANÇADOS (PartnerFiltro) E ORDENAÇÃO POR DATA
+# ========================================================
+
+### 12. PartnerFiltro: Ordenar por Data de Registo Decrescente (mais recente primeiro)
+GET {{baseUrl}}?sortDirection=desc
+
+### 13. PartnerFiltro: Ordenar por Data de Registo Crescente (mais antigo primeiro)
+GET {{baseUrl}}?sortDirection=asc
+
+### 14. PartnerFiltro: Filtrar por Faixa de Limite de Crédito (minCreditLimit e maxCreditLimit)
+GET {{baseUrl}}?minCreditLimit=5000&maxCreditLimit=50000
+
+### 15. PartnerFiltro: Filtrar por Email específico
+GET {{baseUrl}}?email=techsupplies
+
+### 16. PartnerFiltro: Filtrar por Data de Registo (CreatedAtFrom e CreatedAtTo)
+GET {{baseUrl}}?createdAtFrom=2026-01-01T00:00:00Z&sortDirection=desc
+
+### 17. PartnerFiltro: Filtrar por Estado Ativo (isActive=true)
+GET {{baseUrl}}?isActive=true
+
+### 18. Atualizar Parceiro (PUT /api/partners/{id}) - Sucesso 200
 # Substitua o Id e o token de Version correspondente retornado no GET/POST
 PUT {{baseUrl}}/{{partnerId}}
 Content-Type: application/json
@@ -80,7 +102,7 @@ Content-Type: application/json
   "version": "AAAAAAAAB9Q="
 }
 
-### 13. Desativar Parceiro via PUT (IsActive=false)
+### 19. Desativar Parceiro via PUT (IsActive=false)
 PUT {{baseUrl}}/{{partnerId}}
 Content-Type: application/json
 
@@ -98,7 +120,7 @@ Content-Type: application/json
 # CENÁRIOS DE ERRO E VALIDAÇÃO
 # ========================================================
 
-### 14. Erro 409: NIF Duplicado (Tentativa de recriar o mesmo NIF em formato diferente)
+### 20. Erro 409: NIF Duplicado (Tentativa de recriar o mesmo NIF em formato diferente)
 POST {{baseUrl}}
 Content-Type: application/json
 
@@ -110,7 +132,7 @@ Content-Type: application/json
   "creditLimit": 1000.00
 }
 
-### 15. Erro 400: Limite de Crédito com Precisão Excessiva (10.999)
+### 21. Erro 400: Limite de Crédito com Precisão Excessiva (10.999)
 POST {{baseUrl}}
 Content-Type: application/json
 
@@ -122,7 +144,7 @@ Content-Type: application/json
   "creditLimit": 10.999
 }
 
-### 16. Erro 400: NIF com Letras
+### 22. Erro 400: NIF com Letras
 POST {{baseUrl}}
 Content-Type: application/json
 
@@ -133,16 +155,16 @@ Content-Type: application/json
   "creditLimit": 1000.00
 }
 
-### 17. Erro 400: Paginação Inválida (Page = 0)
+### 23. Erro 400: Paginação Inválida (Page = 0)
 GET {{baseUrl}}?page=0
 
-### 18. Erro 400: Tipo Inválido
+### 24. Erro 400: Tipo Inválido
 GET {{baseUrl}}?type=TIPO_INEXISTENTE
 
-### 19. Erro 404: Id Inexistente
+### 25. Erro 404: Id Inexistente
 GET {{baseUrl}}/ffffffff-ffff-ffff-ffff-ffffffffffff
 
-### 20. Erro 400: Version Malformada no PUT
+### 26. Erro 400: Version Malformada no PUT
 PUT {{baseUrl}}/{{partnerId}}
 Content-Type: application/json
 

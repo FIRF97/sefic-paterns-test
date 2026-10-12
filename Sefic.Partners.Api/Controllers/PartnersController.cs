@@ -15,10 +15,7 @@ public class PartnersController : BaseController
     {
         _partnerService = partnerService;
     }
-
-    /// <summary>
-    /// POST /api/partners — Criar entidade (cliente, fornecedor ou ambos)
-    /// </summary>
+    
     [HttpPost]
     [ProducesResponseType(typeof(PartnerResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
@@ -31,10 +28,7 @@ public class PartnersController : BaseController
 
         return CreatedAtAction(nameof(GetById), new { id = result.Data!.Id }, result.Data);
     }
-
-    /// <summary>
-    /// GET /api/partners/{id} — Devolver os dados e Version (mesmo se inativa)
-    /// </summary>
+    
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(PartnerResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
@@ -44,36 +38,16 @@ public class PartnersController : BaseController
         var result = await _partnerService.GetByIdAsync(id);
         return ProcessResult(result);
     }
-
-    /// <summary>
-    /// GET /api/partners — Listar com filtros, contagem total e paginação no SQL Server
-    /// </summary>
+    
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<PartnerResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GetAll(
-        [FromQuery] string? search = null,
-        [FromQuery] string? type = null,
-        [FromQuery] bool includeInactive = false,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20)
+    public async Task<IActionResult> GetAll([FromQuery] PartnerFiltro filtro)
     {
-        var filter = new PageFilter
-        {
-            Search = search,
-            Type = type,
-            IncludeInactive = includeInactive,
-            Page = page,
-            PageSize = pageSize
-        };
-
-        var result = await _partnerService.GetAllAsync(filter);
+        var result = await _partnerService.GetAllAsync(filtro);
         return ProcessResult(result);
     }
-
-    /// <summary>
-    /// PUT /api/partners/{id} — Atualizar entidade com controle de concorrência otimista via Version
-    /// </summary>
+    
     [HttpPut("{id:guid}")]
     [ProducesResponseType(typeof(PartnerResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
