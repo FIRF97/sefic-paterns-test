@@ -1,10 +1,14 @@
+using System.Linq.Expressions;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Sefic.Partners.Core;
+using Sefic.Partners.Data;
 using Sefic.Partners.Services.DTO;
 using Sefic.Partners.Services.Helper;
 using Sefic.Partners.Services.Interface;
 using Sefic.Partners.Shared.Context;
 using Sefic.Partners.Shared.Enums;
+using Sefic.Partners.Shared.Helper;
 using Sefic.Partners.Shared.Model;
 using Sefic.Partners.Shared.Models;
 
@@ -13,10 +17,12 @@ namespace Sefic.Partners.Services;
 public class PartnerService : IPartnerService
 {
     private readonly PartnersDbContext _context;
+    private readonly IUnitOfWork _uow;
 
-    public PartnerService(PartnersDbContext context)
+    public PartnerService(PartnersDbContext context, IUnitOfWork? uow = null)
     {
         _context = context;
+        _uow = uow ?? new UnitOfWork(context);
     }
 
     public async Task<ServiceResult<PartnerResponseDto>> CreateAsync(PartnerCreateDto dto)
@@ -82,217 +88,83 @@ public class PartnerService : IPartnerService
 
     public Task<ServiceResult<PagedResult<PartnerResponseDto>>> GetAllAsync(PageFilter filter)
     {
-        if (filter is PartnerFiltro pf)
-            return GetAllAsync(pf);
-
-        return GetAllAsync(new PartnerFiltro
-        {
-            Page = filter.Page,
-            PageSize = filter.PageSize,
-            Search = filter.Search,
-            Type = filter.Type,
-            IncludeInactive = filter.IncludeInactive
-        });
+        return GetAllAsync(filter, null);
     }
 
-    public async Task<ServiceResult<PagedResult<PartnerResponseDto>>> GetAllAsync(PartnerFiltro filtro)
+    public Task<ServiceResult<PagedResult<PartnerResponseDto>>> GetAllAsync(PartnerFiltro filtro)
     {
-        if (!PartnerValidator.ValidatePagination(filtro.Page, filtro.PageSize, out var paginationError))
+        var pageFilter = new PageFilter
+        {
+            Page = filtro.Page,
+            PageSize = filtro.PageSize,
+            Search = filtro.Search,
+            Type = filtro.Type,
+            IncludeInactive = filtro.IncludeInactive
+        };
+
+        return GetAllAsync(pageFilter, filtro);
+    }
+
+    public async Task<ServiceResult<PagedResult<PartnerResponseDto>>> GetAllAsync(PageFilter filter, PartnerFiltro? filtro = null)
+    {
+        if (!PartnerValidator.ValidatePagination(filter.Page, filter.PageSize, out var paginationError))
             return ServiceResult<PagedResult<PartnerResponseDto>>.BadRequest(paginationError!);
 
-        PartnerType? filterType = null;
-        if (!string.IsNullOrWhiteSpace(filtro.Type))
+        var typeToValidate = filtro?.Type ?? filter.Type;
+        if (!string.IsNullOrWhiteSpace(typeToValidate) && !Enum.TryParse<PartnerType>(typeToValidate.Trim(), true, out _))
         {
-            if (Enum.TryParse<PartnerType>(filtro.Type.Trim(), true, out var parsedType))
-            {
-                filterType = parsedType;
-            }
-            else
-            {
-                return ServiceResult<PagedResult<PartnerResponseDto>>.BadRequest("Type inválido no filtro. Valores aceites: CUSTOMER, SUPPLIER, BOTH.");
-            }
+            return ServiceResult<PagedResult<PartnerResponseDto>>.BadRequest("Type inválido no filtro. Valores aceites: CUSTOMER, SUPPLIER, BOTH.");
         }
 
-        IQueryable<Partner> query = _context.Partners.AsNoTracking();
+        // Determinar ordenação dinâmica aplicada diretamente no banco
+        string? orderByClause = null;
+        bool isDescending = (filtro?.OrderByDescending ?? false) ||
+            string.Equals(filtro?.SortDirection, "desc", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(filtro?.SortDirection, "decrescente", StringComparison.OrdinalIgnoreCase);
 
-        // 1. Filtro por Id
-        if (filtro.Id.HasValue && filtro.Id.Value != Guid.Empty)
-        {
-            query = query.Where(p => p.Id == filtro.Id.Value);
-        }
-
-        // 2. Filtro IsActive / IncludeInactive
-        if (filtro.IsActive.HasValue)
-        {
-            query = query.Where(p => p.IsActive == filtro.IsActive.Value);
-        }
-        else if (!filtro.IncludeInactive)
-        {
-            query = query.Where(p => p.IsActive);
-        }
-
-        // 3. Filtro por Type:
-        // CUSTOMER inclui CUSTOMER e BOTH
-        // SUPPLIER inclui SUPPLIER e BOTH
-        // BOTH inclui apenas BOTH
-        if (filterType.HasValue)
-        {
-            query = filterType.Value switch
-            {
-                PartnerType.CUSTOMER => query.Where(p => p.Type == PartnerType.CUSTOMER || p.Type == PartnerType.BOTH),
-                PartnerType.SUPPLIER => query.Where(p => p.Type == PartnerType.SUPPLIER || p.Type == PartnerType.BOTH),
-                PartnerType.BOTH => query.Where(p => p.Type == PartnerType.BOTH),
-                _ => query
-            };
-        }
-
-        // 4. Filtro específico por Nome
-        if (!string.IsNullOrWhiteSpace(filtro.Name))
-        {
-            var nameTrimmed = filtro.Name.Trim();
-            query = query.Where(p => EF.Functions.Like(p.Name, $"%{nameTrimmed}%"));
-        }
-
-        // 5. Filtro específico por NIF (TaxNumber)
-        if (!string.IsNullOrWhiteSpace(filtro.TaxNumber))
-        {
-            var nifNormalized = TaxNumberHelper.Normalize(filtro.TaxNumber);
-            if (!string.IsNullOrWhiteSpace(nifNormalized))
-            {
-                query = query.Where(p => p.TaxNumber.Contains(nifNormalized));
-            }
-        }
-
-        // 6. Filtro específico por Email
-        if (!string.IsNullOrWhiteSpace(filtro.Email))
-        {
-            var emailTrimmed = filtro.Email.Trim();
-            query = query.Where(p => p.Email != null && EF.Functions.Like(p.Email, $"%{emailTrimmed}%"));
-        }
-
-        // 7. Filtro por CreditLimit (exato ou intervalo)
-        if (filtro.CreditLimit.HasValue)
-        {
-            query = query.Where(p => p.CreditLimit == filtro.CreditLimit.Value);
-        }
-        if (filtro.MinCreditLimit.HasValue)
-        {
-            query = query.Where(p => p.CreditLimit >= filtro.MinCreditLimit.Value);
-        }
-        if (filtro.MaxCreditLimit.HasValue)
-        {
-            query = query.Where(p => p.CreditLimit <= filtro.MaxCreditLimit.Value);
-        }
-
-        // 8. Filtro por Data de Registo (CreatedAt)
-        if (filtro.CreatedAt.HasValue)
-        {
-            var targetDate = filtro.CreatedAt.Value.Date;
-            var nextDay = targetDate.AddDays(1);
-            query = query.Where(p => p.CreatedAt >= targetDate && p.CreatedAt < nextDay);
-        }
-        if (filtro.CreatedAtFrom.HasValue)
-        {
-            query = query.Where(p => p.CreatedAt >= filtro.CreatedAtFrom.Value);
-        }
-        if (filtro.CreatedAtTo.HasValue)
-        {
-            query = query.Where(p => p.CreatedAt <= filtro.CreatedAtTo.Value);
-        }
-
-        // 9. Filtro por Data de Atualização (UpdatedAt)
-        if (filtro.UpdatedAt.HasValue)
-        {
-            var targetDate = filtro.UpdatedAt.Value.Date;
-            var nextDay = targetDate.AddDays(1);
-            query = query.Where(p => p.UpdatedAt >= targetDate && p.UpdatedAt < nextDay);
-        }
-        if (filtro.UpdatedAtFrom.HasValue)
-        {
-            query = query.Where(p => p.UpdatedAt >= filtro.UpdatedAtFrom.Value);
-        }
-        if (filtro.UpdatedAtTo.HasValue)
-        {
-            query = query.Where(p => p.UpdatedAt <= filtro.UpdatedAtTo.Value);
-        }
-
-        // 10. Filtro Search (busca global por nome ou NIF):
-        if (!string.IsNullOrWhiteSpace(filtro.Search))
-        {
-            var searchTrimmed = filtro.Search.Trim();
-            var searchNifNormalized = TaxNumberHelper.Normalize(searchTrimmed);
-
-            if (searchNifNormalized.Length > 0 && searchNifNormalized.Any(char.IsDigit))
-            {
-                query = query.Where(p => EF.Functions.Like(p.Name, $"%{searchTrimmed}%") || p.TaxNumber.Contains(searchNifNormalized));
-            }
-            else
-            {
-                query = query.Where(p => EF.Functions.Like(p.Name, $"%{searchTrimmed}%"));
-            }
-        }
-
-        // 11. Ordenação mediante a data de registo (CreatedAt) ou padrão por Name
-        bool isDescending = filtro.OrderByDescending ??
-            (string.Equals(filtro.SortDirection, "desc", StringComparison.OrdinalIgnoreCase) ||
-             string.Equals(filtro.SortDirection, "decrescente", StringComparison.OrdinalIgnoreCase));
-
-        bool isAscending = (filtro.OrderByDescending == false) ||
-            (string.Equals(filtro.SortDirection, "asc", StringComparison.OrdinalIgnoreCase) ||
-             string.Equals(filtro.SortDirection, "crescente", StringComparison.OrdinalIgnoreCase));
+        bool isAscending = (filtro?.OrderByDescending == false) ||
+            string.Equals(filtro?.SortDirection, "asc", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(filtro?.SortDirection, "crescente", StringComparison.OrdinalIgnoreCase);
 
         bool sortByCreatedAt = isDescending || isAscending ||
-            string.Equals(filtro.OrderBy, "CreatedAt", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(filtro.OrderBy, "DataRegisto", StringComparison.OrdinalIgnoreCase);
+            string.Equals(filtro?.OrderBy, "CreatedAt", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(filtro?.OrderBy, "DataRegisto", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(filter.OrderBy, "CreatedAt", StringComparison.OrdinalIgnoreCase);
 
         if (sortByCreatedAt)
         {
-            query = isDescending
-                ? query.OrderByDescending(p => p.CreatedAt).ThenBy(p => p.Id)
-                : query.OrderBy(p => p.CreatedAt).ThenBy(p => p.Id);
+            orderByClause = isDescending ? "CreatedAt desc, Id asc" : "CreatedAt asc, Id asc";
+        }
+        else if (!string.IsNullOrWhiteSpace(filter.OrderBy))
+        {
+            orderByClause = filter.OrderBy;
         }
         else
         {
-            // Ordenação padrão da especificação original: Name e depois Id
-            query = query.OrderBy(p => p.Name).ThenBy(p => p.Id);
+            // Padrão Fundcube / Especificação: ordenação determinística por Name e depois Id
+            orderByClause = "Name asc, Id asc";
         }
 
-        var totalCount = await query.CountAsync();
+        filtro ??= new PartnerFiltro();
 
-        // Projeção direta no banco de dados trazendo estritamente as colunas necessárias
-        var items = await query
-            .Skip((filtro.Page - 1) * filtro.PageSize)
-            .Take(filtro.PageSize)
-            .Select(p => new
-            {
-                p.Id,
-                p.Name,
-                p.TaxNumber,
-                p.Type,
-                p.Email,
-                p.CreditLimit,
-                p.IsActive,
-                p.CreatedAt,
-                p.UpdatedAt,
-                p.Version
-            })
-            .ToListAsync();
+        if (string.IsNullOrWhiteSpace(filtro.Search) && !string.IsNullOrWhiteSpace(filter.Search))
+            filtro.Search = filter.Search;
 
-        var dtos = items.Select(p => new PartnerResponseDto
-        {
-            Id = p.Id,
-            Name = p.Name,
-            TaxNumber = p.TaxNumber,
-            Type = p.Type,
-            Email = p.Email,
-            CreditLimit = p.CreditLimit,
-            IsActive = p.IsActive,
-            CreatedAt = p.CreatedAt,
-            UpdatedAt = p.UpdatedAt,
-            Version = p.Version != null && p.Version.Length > 0 ? Convert.ToBase64String(p.Version) : string.Empty
-        }).ToList();
+        if (string.IsNullOrWhiteSpace(filtro.Type) && !string.IsNullOrWhiteSpace(filter.Type))
+            filtro.Type = filter.Type;
 
-        var pagedResult = new PagedResult<PartnerResponseDto>(dtos, totalCount, filtro.Page, filtro.PageSize);
+        if (!filtro.IncludeInactive && filter.IncludeInactive)
+            filtro.IncludeInactive = filter.IncludeInactive;
+
+        // 2. Consulta executada diretamente no repositório aplicando o filtro via QueryBuilder e paginação no SQL Server (padrão ms-core-fundcube)
+        var pagedEntities = await _uow.PartnerRepository.GetAllAsync(
+            filter,
+            orderBy: orderByClause,
+            filtrosPropriedades: filtro.BuildFilter()
+        );
+
+        var dtos = pagedEntities.Items.Select(PartnerResponseDto.FromEntity).ToList();
+        var pagedResult = new PagedResult<PartnerResponseDto>(dtos, pagedEntities.TotalCount, pagedEntities.Page, pagedEntities.PageSize);
         return ServiceResult<PagedResult<PartnerResponseDto>>.Success(pagedResult);
     }
 

@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Sefic.Partners.Shared.Context;
 using Sefic.Partners.Shared.Interface;
+using Sefic.Partners.Shared.Models;
 
 namespace Sefic.Partners.Data;
 
@@ -9,11 +10,28 @@ public class Repository<T> : IRepository<T> where T : class
 {
     private readonly PartnersDbContext _context;
     private readonly DbSet<T> _dbc;
+    private readonly IPagedResponseBuilder _pagedResponseBuilder;
 
-    public Repository(PartnersDbContext context)
+    public Repository(PartnersDbContext context, IPagedResponseBuilder? pagedResponseBuilder = null)
     {
         _context = context;
         _dbc = _context.Set<T>();
+        _pagedResponseBuilder = pagedResponseBuilder ?? new PagedResponseBuilder();
+    }
+
+    public async Task<PagedResult<T>> GetAllAsync(
+        PageFilter filter,
+        string? orderBy = null,
+        string[]? includes = null,
+        Expression<Func<T, bool>>? filtrosPropriedades = null)
+    {
+        IQueryable<T> query = new QueryBuilder<T>(_dbc)
+            .Include(includes)
+            .Filter(filtrosPropriedades)
+            .OrderBy(orderBy)
+            .Build();
+
+        return await _pagedResponseBuilder.CreatePagedResultAsync(query, filter.Page, filter.PageSize);
     }
 
     public async Task<T?> GetByIdAsync(Guid id)

@@ -42,6 +42,15 @@ public class QueryBuilder<T> where T : class
         return this;
     }
 
+    public QueryBuilder<T> OrderBy(string? propertyName)
+    {
+        if (!string.IsNullOrWhiteSpace(propertyName))
+        {
+            _query = System.Linq.Dynamic.Core.DynamicQueryableExtensions.OrderBy(_query, propertyName);
+        }
+        return this;
+    }
+
     public IQueryable<T> Build()
     {
         return _query;

@@ -38,13 +38,15 @@ public class PartnersController : BaseController
         var result = await _partnerService.GetByIdAsync(id);
         return ProcessResult(result);
     }
-    
+    /// <summary>
+    /// GET /api/partners — Listar com filtros e paginação aplicados diretamente no banco de dados via QueryBuilder e PartnerFiltro
+    /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<PartnerResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GetAll([FromQuery] PartnerFiltro filtro)
+    public async Task<IActionResult> GetAll([FromQuery] PageFilter filter, [FromQuery] PartnerFiltro? filtro = null)
     {
-        var result = await _partnerService.GetAllAsync(filtro);
+        var result = await _partnerService.GetAllAsync(filter, filtro);
         return ProcessResult(result);
     }
     

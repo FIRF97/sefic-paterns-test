@@ -7,6 +7,7 @@ public class PageFilter
     public string? Search { get; set; }
     public string? Type { get; set; }
     public bool IncludeInactive { get; set; } = false;
+    public string? OrderBy { get; set; }
 
     public PageFilter() { }
 
