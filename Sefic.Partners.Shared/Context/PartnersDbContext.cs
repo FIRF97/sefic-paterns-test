@@ -34,6 +34,16 @@ public class PartnersDbContext : DbContext
                 .IsUnique()
                 .HasDatabaseName("IX_Partners_TaxNumber_Unique");
 
+            // Índices de alta performance para ordenação e filtros no SQL Server
+            entity.HasIndex(p => p.CreatedAt)
+                .HasDatabaseName("IX_Partners_CreatedAt");
+
+            entity.HasIndex(p => new { p.IsActive, p.CreatedAt })
+                .HasDatabaseName("IX_Partners_IsActive_CreatedAt");
+
+            entity.HasIndex(p => p.Name)
+                .HasDatabaseName("IX_Partners_Name");
+
             entity.Property(p => p.Type)
                 .IsRequired()
                 .HasConversion<string>()

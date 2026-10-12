@@ -259,12 +259,38 @@ public class PartnerService : IPartnerService
 
         var totalCount = await query.CountAsync();
 
+        // Projeção direta no banco de dados trazendo estritamente as colunas necessárias
         var items = await query
             .Skip((filtro.Page - 1) * filtro.PageSize)
             .Take(filtro.PageSize)
+            .Select(p => new
+            {
+                p.Id,
+                p.Name,
+                p.TaxNumber,
+                p.Type,
+                p.Email,
+                p.CreditLimit,
+                p.IsActive,
+                p.CreatedAt,
+                p.UpdatedAt,
+                p.Version
+            })
             .ToListAsync();
 
-        var dtos = items.Select(PartnerResponseDto.FromEntity).ToList();
+        var dtos = items.Select(p => new PartnerResponseDto
+        {
+            Id = p.Id,
+            Name = p.Name,
+            TaxNumber = p.TaxNumber,
+            Type = p.Type,
+            Email = p.Email,
+            CreditLimit = p.CreditLimit,
+            IsActive = p.IsActive,
+            CreatedAt = p.CreatedAt,
+            UpdatedAt = p.UpdatedAt,
+            Version = p.Version != null && p.Version.Length > 0 ? Convert.ToBase64String(p.Version) : string.Empty
+        }).ToList();
 
         var pagedResult = new PagedResult<PartnerResponseDto>(dtos, totalCount, filtro.Page, filtro.PageSize);
         return ServiceResult<PagedResult<PartnerResponseDto>>.Success(pagedResult);
