@@ -9,7 +9,9 @@ public interface IRepository<T> where T : class
         PageFilter filter,
         string? orderBy = null,
         string[]? includes = null,
-        Expression<Func<T, bool>>? filtrosPropriedades = null);
+        Expression<Func<T, bool>>? filtrosPropriedades = null,
+        string route = "/api/partners",
+        string mensagem = "Partner");
 
     Task<T?> GetByIdAsync(Guid id);
     Task<T?> GetOneByFilterAsync(Expression<Func<T, bool>>? filter = null, string[]? include = null);

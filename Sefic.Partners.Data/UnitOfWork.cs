@@ -9,15 +9,17 @@ namespace Sefic.Partners.Data;
 public class UnitOfWork : IUnitOfWork
 {
     private readonly PartnersDbContext _context;
+    private readonly IPagedResponseBuilder _pagedResponseBuilder;
     private IRepository<Partner>? _partnerRepository;
 
-    public UnitOfWork(PartnersDbContext context)
+    public UnitOfWork(PartnersDbContext context, IPagedResponseBuilder? pagedResponseBuilder = null)
     {
         _context = context;
+        _pagedResponseBuilder = pagedResponseBuilder ?? new PagedResponseBuilder();
     }
 
     public IRepository<Partner> PartnerRepository =>
-        _partnerRepository ??= new Repository<Partner>(_context);
+        _partnerRepository ??= new Repository<Partner>(_context, _pagedResponseBuilder);
 
     public async Task<bool> CommitAsync()
     {

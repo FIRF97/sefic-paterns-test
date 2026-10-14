@@ -88,83 +88,55 @@ public class PartnerService : IPartnerService
 
     public Task<ServiceResult<PagedResult<PartnerResponseDto>>> GetAllAsync(PageFilter filter)
     {
-        return GetAllAsync(filter, null);
-    }
+        if (filter is PartnerFilter pf)
+            return GetAllAsync(pf);
 
-    public Task<ServiceResult<PagedResult<PartnerResponseDto>>> GetAllAsync(PartnerFiltro filtro)
-    {
-        var pageFilter = new PageFilter
+        var partnerFilter = new PartnerFilter(filter.PageNumber, filter.PageSize)
         {
-            Page = filtro.Page,
-            PageSize = filtro.PageSize,
-            Search = filtro.Search,
-            Type = filtro.Type,
-            IncludeInactive = filtro.IncludeInactive
+            OrderBy = filter.OrderBy
         };
 
-        return GetAllAsync(pageFilter, filtro);
+        return GetAllAsync(partnerFilter);
     }
 
-    public async Task<ServiceResult<PagedResult<PartnerResponseDto>>> GetAllAsync(PageFilter filter, PartnerFiltro? filtro = null)
+    public async Task<ServiceResult<PagedResult<PartnerResponseDto>>> GetAllAsync(PartnerFilter filter, string route = "/api/partners")
     {
-        if (!PartnerValidator.ValidatePagination(filter.Page, filter.PageSize, out var paginationError))
+        if (!PartnerValidator.ValidatePagination(filter.PageNumber, filter.PageSize, out var paginationError))
             return ServiceResult<PagedResult<PartnerResponseDto>>.BadRequest(paginationError!);
 
-        var typeToValidate = filtro?.Type ?? filter.Type;
-        if (!string.IsNullOrWhiteSpace(typeToValidate) && !Enum.TryParse<PartnerType>(typeToValidate.Trim(), true, out _))
+        if (!string.IsNullOrWhiteSpace(filter.Type) && !Enum.TryParse<PartnerType>(filter.Type.Trim(), true, out _))
         {
             return ServiceResult<PagedResult<PartnerResponseDto>>.BadRequest("Type inválido no filtro. Valores aceites: CUSTOMER, SUPPLIER, BOTH.");
         }
+        
+        var orderByClause = !string.IsNullOrWhiteSpace(filter.OrderBy)
+            ? filter.OrderBy
+            : "CreatedAt desc, Id asc";
 
-        // Determinar ordenação dinâmica aplicada diretamente no banco
-        string? orderByClause = null;
-        bool isDescending = (filtro?.OrderByDescending ?? false) ||
-            string.Equals(filtro?.SortDirection, "desc", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(filtro?.SortDirection, "decrescente", StringComparison.OrdinalIgnoreCase);
+        var combinedFilter = filter.BuildFilter();
 
-        bool isAscending = (filtro?.OrderByDescending == false) ||
-            string.Equals(filtro?.SortDirection, "asc", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(filtro?.SortDirection, "crescente", StringComparison.OrdinalIgnoreCase);
-
-        bool sortByCreatedAt = isDescending || isAscending ||
-            string.Equals(filtro?.OrderBy, "CreatedAt", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(filtro?.OrderBy, "DataRegisto", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(filter.OrderBy, "CreatedAt", StringComparison.OrdinalIgnoreCase);
-
-        if (sortByCreatedAt)
-        {
-            orderByClause = isDescending ? "CreatedAt desc, Id asc" : "CreatedAt asc, Id asc";
-        }
-        else if (!string.IsNullOrWhiteSpace(filter.OrderBy))
-        {
-            orderByClause = filter.OrderBy;
-        }
-        else
-        {
-            // Padrão Fundcube / Especificação: ordenação determinística por Name e depois Id
-            orderByClause = "Name asc, Id asc";
-        }
-
-        filtro ??= new PartnerFiltro();
-
-        if (string.IsNullOrWhiteSpace(filtro.Search) && !string.IsNullOrWhiteSpace(filter.Search))
-            filtro.Search = filter.Search;
-
-        if (string.IsNullOrWhiteSpace(filtro.Type) && !string.IsNullOrWhiteSpace(filter.Type))
-            filtro.Type = filter.Type;
-
-        if (!filtro.IncludeInactive && filter.IncludeInactive)
-            filtro.IncludeInactive = filter.IncludeInactive;
-
-        // 2. Consulta executada diretamente no repositório aplicando o filtro via QueryBuilder e paginação no SQL Server (padrão ms-core-fundcube)
+        // Consulta executada diretamente no repositório aplicando o filtro via QueryBuilder e paginação no SQL Server
         var pagedEntities = await _uow.PartnerRepository.GetAllAsync(
             filter,
             orderBy: orderByClause,
-            filtrosPropriedades: filtro.BuildFilter()
+            filtrosPropriedades: combinedFilter,
+            route: route,
+            mensagem: "Partner"
         );
 
-        var dtos = pagedEntities.Items.Select(PartnerResponseDto.FromEntity).ToList();
-        var pagedResult = new PagedResult<PartnerResponseDto>(dtos, pagedEntities.TotalCount, pagedEntities.Page, pagedEntities.PageSize);
+        var dtos = pagedEntities.Data.Select(PartnerResponseDto.FromEntity).ToList();
+        var pagedResult = new PagedResult<PartnerResponseDto>(
+            dtos,
+            pagedEntities.TotalRecords,
+            pagedEntities.PageNumber,
+            pagedEntities.PageSize,
+            pagedEntities.TotalPages,
+            pagedEntities.NextPage,
+            pagedEntities.PreviousPage,
+            pagedEntities.FirstPage,
+            pagedEntities.LastPage,
+            pagedEntities.Retorno.Mensagem);
+
         return ServiceResult<PagedResult<PartnerResponseDto>>.Success(pagedResult);
     }
 
@@ -199,8 +171,7 @@ public class PartnerService : IPartnerService
         var otherWithNif = await _context.Partners.AsNoTracking().AnyAsync(p => p.TaxNumber == normalizedNif && p.Id != id);
         if (otherWithNif)
             return ServiceResult<PartnerResponseDto>.Conflict("Já existe outra entidade com este NIF.");
-
-        // Definir a OriginalValue para controle de concorrência otimista via rowversion
+        
         _context.Entry(entity).Property(p => p.Version).OriginalValue = clientVersionBytes;
 
         entity.Name = trimmedName;
@@ -226,6 +197,99 @@ public class PartnerService : IPartnerService
         }
 
         return ServiceResult<PartnerResponseDto>.Success(PartnerResponseDto.FromEntity(entity));
+    }
+
+    public async Task<ServiceResult<int>> SeedAsync()
+    {
+        var initialPartners = new List<Partner>
+        {
+            new Partner
+            {
+                Id = Guid.NewGuid(),
+                Name = "Ana Ferreira",
+                TaxNumber = "001234567",
+                Type = PartnerType.CUSTOMER,
+                Email = "ana.ferreira@example.com",
+                CreditLimit = 5000.00m,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new Partner
+            {
+                Id = Guid.NewGuid(),
+                Name = "Tech Supplies Lda",
+                TaxNumber = "502123456",
+                Type = PartnerType.SUPPLIER,
+                Email = "contacto@techsupplies.com",
+                CreditLimit = 50000.00m,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new Partner
+            {
+                Id = Guid.NewGuid(),
+                Name = "Global Logística & Distribuição",
+                TaxNumber = "509988776",
+                Type = PartnerType.BOTH,
+                Email = "geral@globallog.com",
+                CreditLimit = 120000.00m,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new Partner
+            {
+                Id = Guid.NewGuid(),
+                Name = "Papelaria Central",
+                TaxNumber = "504112233",
+                Type = PartnerType.SUPPLIER,
+                Email = "vendas@papelariacentral.pt",
+                CreditLimit = 7500.00m,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new Partner
+            {
+                Id = Guid.NewGuid(),
+                Name = "Consultoria & Serviços Alpha",
+                TaxNumber = "508765432",
+                Type = PartnerType.CUSTOMER,
+                Email = "info@consultoriaalpha.ao",
+                CreditLimit = 25000.00m,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            }
+        };
+
+        var insertedCount = 0;
+        foreach (var partner in initialPartners)
+        {
+            var existing = await _context.Partners.FirstOrDefaultAsync(p => p.TaxNumber == partner.TaxNumber);
+            if (existing == null)
+            {
+                await _uow.PartnerRepository.AddAsync(partner);
+                insertedCount++;
+            }
+            else if (!existing.IsActive)
+            {
+                existing.IsActive = true;
+                existing.UpdatedAt = DateTime.UtcNow;
+                insertedCount++;
+            }
+        }
+
+        if (insertedCount > 0)
+        {
+            await _uow.CommitAsync();
+        }
+
+        return ServiceResult<int>.Success(
+            insertedCount,
+            $"Seed executado com sucesso. {insertedCount} novo(s) parceiro(s) adicionado(s). Total no cadastro: {await _uow.PartnerRepository.CountAsync()}.");
     }
 
     private static bool IsUniqueConstraintViolation(DbUpdateException ex)

@@ -23,7 +23,9 @@ public class Repository<T> : IRepository<T> where T : class
         PageFilter filter,
         string? orderBy = null,
         string[]? includes = null,
-        Expression<Func<T, bool>>? filtrosPropriedades = null)
+        Expression<Func<T, bool>>? filtrosPropriedades = null,
+        string route = "/api/partners",
+        string mensagem = "Partner")
     {
         IQueryable<T> query = new QueryBuilder<T>(_dbc)
             .Include(includes)
@@ -31,7 +33,7 @@ public class Repository<T> : IRepository<T> where T : class
             .OrderBy(orderBy)
             .Build();
 
-        return await _pagedResponseBuilder.CreatePagedResultAsync(query, filter.Page, filter.PageSize);
+        return await _pagedResponseBuilder.CreatePagedResultAsync(query, filter, route, mensagem);
     }
 
     public async Task<T?> GetByIdAsync(Guid id)

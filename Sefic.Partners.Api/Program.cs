@@ -1,4 +1,5 @@
 using Sefic.Partners.Api;
+using Sefic.Partners.Api.Helper;
 using Sefic.Partners.Api.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -68,12 +69,11 @@ app.UseSwaggerUI(c =>
 app.UseRouting();
 app.UseCors("DefaultCors");
 
-// Redirecionar rota raiz diretamente para o Swagger
-app.MapGet("/", () => Results.Redirect("/swagger"));
+app.MapGet("/", () => Results.Content("SEFIC Partners Test"));
 
 app.MapControllers();
 
 app.Run();
 
-// Tornar a classe Program pública para WebApplicationFactory nos testes de integração
+
 public partial class Program { }

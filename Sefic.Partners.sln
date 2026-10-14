@@ -13,8 +13,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sefic.Partners.Services", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sefic.Partners.Api", "Sefic.Partners.Api\Sefic.Partners.Api.csproj", "{9C17F871-0EDB-4B5C-9436-6E0853EBF6C8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sefic.Partners.Tests", "Sefic.Partners.Tests\Sefic.Partners.Tests.csproj", "{C4AB2936-199E-4CF6-8639-9F74F449EEF3}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -85,18 +83,6 @@ Global
 		{9C17F871-0EDB-4B5C-9436-6E0853EBF6C8}.Release|x64.Build.0 = Release|Any CPU
 		{9C17F871-0EDB-4B5C-9436-6E0853EBF6C8}.Release|x86.ActiveCfg = Release|Any CPU
 		{9C17F871-0EDB-4B5C-9436-6E0853EBF6C8}.Release|x86.Build.0 = Release|Any CPU
-		{C4AB2936-199E-4CF6-8639-9F74F449EEF3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C4AB2936-199E-4CF6-8639-9F74F449EEF3}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C4AB2936-199E-4CF6-8639-9F74F449EEF3}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{C4AB2936-199E-4CF6-8639-9F74F449EEF3}.Debug|x64.Build.0 = Debug|Any CPU
-		{C4AB2936-199E-4CF6-8639-9F74F449EEF3}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{C4AB2936-199E-4CF6-8639-9F74F449EEF3}.Debug|x86.Build.0 = Debug|Any CPU
-		{C4AB2936-199E-4CF6-8639-9F74F449EEF3}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C4AB2936-199E-4CF6-8639-9F74F449EEF3}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C4AB2936-199E-4CF6-8639-9F74F449EEF3}.Release|x64.ActiveCfg = Release|Any CPU
-		{C4AB2936-199E-4CF6-8639-9F74F449EEF3}.Release|x64.Build.0 = Release|Any CPU
-		{C4AB2936-199E-4CF6-8639-9F74F449EEF3}.Release|x86.ActiveCfg = Release|Any CPU
-		{C4AB2936-199E-4CF6-8639-9F74F449EEF3}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

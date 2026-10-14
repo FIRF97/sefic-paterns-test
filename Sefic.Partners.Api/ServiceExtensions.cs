@@ -20,7 +20,7 @@ public static class ServiceExtensions
         services.AddDbContext<PartnersDbContext>(options =>
         {
             var connectionString = configuration.GetConnectionString("DefaultConnection") 
-                ?? "Server=(localdb)\\mssqllocaldb;Database=SeficPartnersDb;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True";
+                ?? "Server=localhost\\SQLEXPRESS;Database=SeficPartnersDb;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True";
 
             options.UseSqlServer(connectionString, sql =>
             {

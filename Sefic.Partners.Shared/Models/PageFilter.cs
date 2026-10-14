@@ -1,19 +1,19 @@
 namespace Sefic.Partners.Shared.Models;
 
+/// <summary>
+/// Filtro base de paginação e ordenação genérico.
+/// </summary>
 public class PageFilter
 {
-    public int Page { get; set; } = 1;
+    public int PageNumber { get; set; } = 1;
     public int PageSize { get; set; } = 20;
-    public string? Search { get; set; }
-    public string? Type { get; set; }
-    public bool IncludeInactive { get; set; } = false;
     public string? OrderBy { get; set; }
 
     public PageFilter() { }
 
-    public PageFilter(int page, int pageSize)
+    public PageFilter(int pageNumber, int pageSize)
     {
-        Page = page;
+        PageNumber = pageNumber;
         PageSize = pageSize;
     }
 }

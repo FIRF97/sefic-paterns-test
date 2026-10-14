@@ -16,18 +16,21 @@ public class UriService : IUriService
     public Uri GetPageUri(PageFilter filter, string route)
     {
         var endpoint = string.Concat(_baseUri, route.StartsWith('/') ? route : "/" + route);
-        var modifiedUri = QueryHelpers.AddQueryString(endpoint, "page", filter.Page.ToString());
+        var modifiedUri = QueryHelpers.AddQueryString(endpoint, "pageNumber", filter.PageNumber.ToString());
         modifiedUri = QueryHelpers.AddQueryString(modifiedUri, "pageSize", filter.PageSize.ToString());
 
-        if (!string.IsNullOrWhiteSpace(filter.Search))
-            modifiedUri = QueryHelpers.AddQueryString(modifiedUri, "search", filter.Search);
+        if (filter is PartnerFilter pf)
+        {
+            if (!string.IsNullOrWhiteSpace(pf.Search))
+                modifiedUri = QueryHelpers.AddQueryString(modifiedUri, "search", pf.Search);
 
-        if (!string.IsNullOrWhiteSpace(filter.Type))
-            modifiedUri = QueryHelpers.AddQueryString(modifiedUri, "type", filter.Type);
+            if (!string.IsNullOrWhiteSpace(pf.Type))
+                modifiedUri = QueryHelpers.AddQueryString(modifiedUri, "type", pf.Type);
 
-        if (filter.IncludeInactive)
-            modifiedUri = QueryHelpers.AddQueryString(modifiedUri, "includeInactive", "true");
-
+            if (pf.IncludeInactive)
+                modifiedUri = QueryHelpers.AddQueryString(modifiedUri, "includeInactive", "true");
+        }
+        
         return new Uri(modifiedUri);
     }
 

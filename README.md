@@ -1,157 +1,182 @@
-# Sefic Partners API — Gestão de Clientes e Fornecedores
+# Sefic Partners API
 
-API RESTful desenvolvida em **ASP.NET Core (C#)** com **Entity Framework Core** e **SQL Server**, projetada para a gestão de parceiros de negócio (clientes, fornecedores ou ambos) de uma única empresa, em total conformidade com os requisitos do documento **`02-Fase-Pratica.pdf`** e seguindo a arquitetura em camadas do projeto de referência **`ms-core-fundcube`**.
-
----
-
-## 🛠️ Tecnologias e Versões
-
-- **.NET SDK / Runtime:** `.NET 9.0` (C# 13) / Compatível com `.NET 8.0 LTS`
-- **Entity Framework Core:** `9.0.8` (SQL Server Provider, Tools, Design)
-- **Base de Dados:** Microsoft SQL Server 2022 (compatível com Developer Edition, Express e LocalDB)
-- **Containerização:** Docker e Docker Compose
-- **Testes Automatizados:** xUnit `2.9.2`, Microsoft.AspNetCore.Mvc.Testing `9.0.0`
-- **Documentação de API:** Swagger / OpenAPI via Swashbuckle `9.0.3`
+API RESTful para gestao de parceiros de negocio (clientes, fornecedores ou ambos) em ambiente de empresa unica. Desenvolvida em ASP.NET Core (.NET 9) com Entity Framework Core e Microsoft SQL Server, em conformidade com as especificacoes do documento 02-Fase-Pratica.pdf e com o padrao arquitetural em camadas do projeto de referencia ms-core-fundcube.
 
 ---
 
-## 🏛️ Arquitetura do Projeto (Baseada no Padrão Fundcube)
+## 1. Visao Geral da Arquitetura
 
-A solução está estruturada em 6 projetos modulares, mantendo a separação clara de responsabilidades:
+A solucao esta estruturada em camadas modulares com separacao estrita de responsabilidades:
 
+- **Sefic.Partners.Api**: Controladores HTTP, configuracao do pipeline ASP.NET Core, Swagger OpenAPI, pagina inicial de apresentacao e middleware global de excecoes.
+- **Sefic.Partners.Core**: Interfaces e contratos de dominio (IUnitOfWork).
+- **Sefic.Partners.Data**: Implementacao do repositorio generico (Repository<T>), Unit of Work (UnitOfWork), construtor de paginacao (PagedResponseBuilder) e extensoes de consulta.
+- **Sefic.Partners.Services**: Regras de negocio, validacoes de dominio, mapeamento de DTOs e servico de aplicacao (PartnerService).
+- **Sefic.Partners.Shared**: Entidades de dominio (Partner, BaseEntity), enums (PartnerType), modelos de paginacao (PageFilter, PartnerFilter), DbContext (PartnersDbContext) e migracoes do Entity Framework Core.
+- **Sefic.Partners.Tests**: Testes automatizados de integracao e unidade cobrindo todos os cenarios do teste pratico.
+
+### Localizacao das Migracoes
+
+As migracoes estao localizadas no assembly Shared (Sefic.Partners.Shared), mantendo o projeto Api desacoplado de dependencias diretas de design de base de dados.
+
+---
+
+## 2. Tecnologias
+
+- **Runtime / SDK**: .NET 9.0 (C# 13)
+- **ORM**: Entity Framework Core 9.0.8 (SQL Server Provider, Tools, Design)
+- **Base de Dados**: Microsoft SQL Server 2022 (compativel com Developer Edition, Express e LocalDB)
+- **Documentacao de API**: Swagger / OpenAPI (Swashbuckle 9.0.3)
+- **Containerizacao**: Docker e Docker Compose
+- **Testes**: xUnit 2.9.2 e Microsoft.AspNetCore.Mvc.Testing 9.0.0
+
+---
+
+## 3. Regras de Dominio e Validacoes
+
+### Entidade Partner
+
+- **Id**: Identificador unico global (GUID) gerado pelo servidor.
+- **Name**: Obrigatorio, entre 2 e 100 caracteres. Espacos no inicio e fim sao removidos (Trim).
+- **TaxNumber (NIF)**: Obrigatorio. Formatacao com pontos, tracos ou espacos e removida automaticamente. Exige exatamente 9 digitos numericos e preserva zeros a esquerda.
+- **Unicidade do NIF**: Garantida por indice unico (IX_Partners_TaxNumber_Unique) em todo o cadastro. Permanece reservado mesmo apos desativacao (soft delete). Tentativas de duplicidade retornam status 409 Conflict.
+- **Type**: Valores permitidos: CUSTOMER, SUPPLIER e BOTH.
+- **Email**: Opcional. String vazia ou apenas com espacos e gravada como null. Quando preenchido, valida formato de email e aplica Trim.
+- **CreditLimit**: Valor decimal entre 0 e 1.000.000,00 com no maximo duas casas decimais, persistido como decimal(18,2). Valores com precisao superior (ex.: 10.999) sao rejeitados com 400 Bad Request.
+- **IsActive**: Booleano. Novo registo inicia ativo (true). A desativacao e efetuada via PUT (soft delete).
+- **Version**: Controle de concorrencia otimista real via rowversion do SQL Server, transmitido nos DTOs como token Base64 opaco. Atualizacoes com versao defasada retornam 409 Conflict.
+- **CreatedAt / UpdatedAt**: Carimbos de data/hora UTC gerados no servidor. CreatedAt e imutavel apos a criacao.
+
+---
+
+## 4. Endpoints da API
+
+### Gestao de Parceiros (PartnersController)
+
+| Metodo | Rota | Descricao | Status de Sucesso |
+|---|---|---|---|
+| POST | /api/partners | Cria um parceiro (cliente, fornecedor ou misto). | 201 Created |
+| GET | /api/partners/{id} | Obtem dados completos e token de versao do parceiro por GUID. | 200 OK |
+| GET | /api/partners | Lista parceiros paginados, ordenados por data de criacao (CreatedAt desc, Id asc). | 200 OK |
+| PUT | /api/partners/{id} | Atualiza dados do parceiro com verificacao de concorrencia otimista. | 200 OK |
+
+#### Parametros de Consulta em GET /api/partners
+
+O filtro de consulta herda de PageFilter (PartnerFilter : PageFilter) para manter a assinatura limpa e sem redundancias:
+
+- `pageNumber`: Numero da pagina (padrao: 1). Suporta tambem ?page=1 por compatibilidade.
+- `pageSize`: Quantidade de registos por pagina (padrao: 20, maximo: 100).
+- `search`: Pesquisa textual sobre Name ou TaxNumber.
+- `type`: Filtro por tipo de parceiro (CUSTOMER, SUPPLIER, BOTH).
+- `includeInactive`: Booleano (padrao: false). Se true, inclui parceiros inativos.
+- `orderBy`: Clausula de ordenacao opcional. Padrao: CreatedAt desc, Id asc.
+
+### Carga de Dados Iniciais (SeedController)
+
+| Metodo | Rota | Descricao | Status de Sucesso |
+|---|---|---|---|
+| POST | /api/seed/carregarPartners | Carrega os dados de exemplo iniciais na base de dados. | 200 OK |
+
+### Apresentacao e Documentacao
+
+| Metodo | Rota | Descricao |
+|---|---|---|
+| GET | / | Pagina HTML tecnica com apresentacao da API, resumo do que foi feito e opcao para carregar dados iniciais. |
+| GET | /swagger | Interface interativa Swagger UI / OpenAPI. |
+
+---
+
+## 5. Estrutura da Resposta Paginada
+
+O endpoint GET /api/partners devolve o envelope de paginacao padronizado:
+
+```json
+{
+  "pageSize": 20,
+  "pageNumber": 1,
+  "totalPages": 1,
+  "totalRecords": 4,
+  "records": 4,
+  "nextPage": null,
+  "previousPage": null,
+  "firstPage": "http://localhost:5000/api/partners?pageNumber=1&pageSize=20",
+  "lastPage": "http://localhost:5000/api/partners?pageNumber=1&pageSize=20",
+  "data": [
+    {
+      "id": "b9635bd6-0b44-4cdd-a899-9d6babe5f396",
+      "name": "Ana Silva",
+      "taxNumber": "001234567",
+      "type": "CUSTOMER",
+      "email": "ana.silva@example.com",
+      "creditLimit": 5000.00,
+      "isActive": true,
+      "version": "AAAAAAAAB9E=",
+      "createdAt": "2026-10-14T22:05:22.5266667Z",
+      "updatedAt": "2026-10-14T22:05:22.5266667Z"
+    }
+  ],
+  "retorno": {
+    "status": 200,
+    "mensagem": "Partner"
+  }
+}
 ```
-Sefic.Partners/
-├── Sefic.Partners.Api/          # Camada de Apresentação (Controllers, Middleware Global, DI, Dockerfile)
-├── Sefic.Partners.Core/         # Contratos e Interfaces de Domínio (IUnitOfWork)
-├── Sefic.Partners.Data/         # Persistência EF Core (PartnersDbContext, Repository<T>, UnitOfWork, PagedResponseBuilder)
-├── Sefic.Partners.Services/     # Regras de Negócio, Validações, DTOs e IPartnerService
-├── Sefic.Partners.Shared/       # Entidades (Partner, BaseEntity), Enums, Modelos Comuns e MIGRATIONS
-├── Sefic.Partners.Tests/        # Testes Automatizados (Cobrindo todos os 7 cenários mínimos)
-├── data/                        # Scripts SQL de exemplo (seed.sql)
-├── docker-compose.yml           # Orquestração do SQL Server e da API
-├── requests.http                # Exemplos de requisições HTTP para todos os endpoints
-└── README.md                    # Guia completo de preparação, execução e testes
-```
-
-### Destaque da Regra das Migrações:
-Conforme solicitado expressamente, **as migrações NÃO ficam no projeto Api, mas sim em `Shared` (`Sefic.Partners.Shared`)**:
-- O `PartnersDbContext` está configurado com `sql.MigrationsAssembly("Sefic.Partners.Shared")`.
-- A pasta `Sefic.Partners.Shared/Migrations/` está preparada para receber as migrações geradas pelo utilizador.
-- **Nenhuma migração foi pré-gerada no projeto** para que o utilizador a gere conforme as suas instruções.
 
 ---
 
-## ⚙️ Regras de Domínio e Validações Implementadas
+## 6. Configuracao e Execucao
 
-1. **Entidade Partner:**
-   - `Id`: GUID gerado pelo servidor.
-   - `Name`: Obrigatório, entre 2 e 100 caracteres após `Trim()`.
-   - `TaxNumber` (NIF): Obrigatório, normaliza removendo espaços, pontos e hífenes (`.`, `-`, ` `) e exige exatamente 9 dígitos ASCII. Preserva zeros iniciais.
-   - `TaxNumber Único na BD`: Garantido por índice único (`IX_Partners_TaxNumber_Unique`) em todo o cadastro (incluindo inativos) e resiliente a pedidos concorrentes sem lock em memória.
-   - `Type`: Aceita `CUSTOMER`, `SUPPLIER` ou `BOTH`.
-   - `Email`: Opcional. String vazia ou apenas espaços é guardada como `null`. Quando preenchido, aplica `Trim()` e valida o formato de e-mail.
-   - `CreditLimit`: Decimal entre 0 e 1.000.000, com no máximo duas casas decimais, persistido como `decimal(18,2)`. **Rejeita precisão excessiva (ex: `10.999`) com 400 Bad Request**.
-   - `IsActive`: Inicia a `true` na criação. Desativação/reativação é feita via `PUT /api/partners/{id}`.
-   - `Version`: Token opaco em Base64 baseado em `rowversion` do SQL Server para **concorrência otimista real**.
-   - `CreatedAt` e `UpdatedAt`: Definidos pelo servidor em UTC (`CreatedAt` nunca é alterado pelo cliente).
-
-2. **Endpoints:**
-   - `POST /api/partners`: Cria entidade. Retorna `201 Created` com header `Location`, `Id` e todos os dados incluindo `Version`. Se NIF duplicado, retorna `409 Conflict`.
-   - `GET /api/partners/{id}`: Retorna dados e `Version` (inclusive de inativas). Se não existir, retorna `404 Not Found`.
-   - `GET /api/partners`: Retorna `Items`, `TotalCount`, `Page` e `PageSize`. Suporta `search`, `type`, `includeInactive` (false por defeito), `page` (>= 1) e `pageSize` (1 a 100). Ordena por `Name ASC, Id ASC`.
-   - `PUT /api/partners/{id}`: Atualiza campos. Exige todos os campos e `Version`. Retorna `200 OK` com nova `Version`. Se concorrência ou NIF de outro registo, retorna `409 Conflict`.
-
----
-
-## 🚀 Como Gerar as Migrações (Passo Obrigatório Inicial)
-
-Como as migrações não foram pré-geradas, gere a migração inicial apontando para o projeto `Shared` com o comando:
+### Execucao via Docker Compose
 
 ```bash
-# 1. Navegue até a pasta da solução
-cd Sefic.Partners
-
-# 2. Gerar a migração em Sefic.Partners.Shared
-dotnet ef migrations add InitialCreate --project Sefic.Partners.Shared --startup-project Sefic.Partners.Api
-
-# 3. Aplicar a migração à Base de Dados
-dotnet ef database update --project Sefic.Partners.Shared --startup-project Sefic.Partners.Api
-```
-
-> **Nota:** Caso não tenha a ferramenta CLI do EF Core instalada globalmente, instale-a via:
-> `dotnet tool install --global dotnet-ef`
-
----
-
-## 🐳 Executando com Docker
-
-O projeto já está 100% configurado para rodar com Docker:
-
-```bash
-cd Sefic.Partners
-
-# Iniciar o SQL Server e a API
 docker compose up --build
 ```
 
-- **Swagger da API:** [http://localhost:8080/swagger](http://localhost:8080/swagger)
-- **Porta da API:** `8080`
-- **SQL Server:** `localhost:1433` (Utilizador: `sa`, Palavra-passe: `YourStrong@Passw0rd`)
+- Swagger UI: http://localhost:8080/swagger
+- Painel de Apresentacao: http://localhost:8080/
+- SQL Server: localhost:1433 (Utilizador: sa, Senha: YourStrong@Passw0rd)
 
----
+### Execucao Local
 
-## 💻 Executando Localmente (Sem Docker)
+1. Configurar a string de conexao no ficheiro `Sefic.Partners.Api/appsettings.Development.json`:
 
-1. Certifique-se de que tem o SQL Server ou SQL Server LocalDB em execução.
-2. Atualize a Connection String em `appsettings.Development.json` caso necessário.
-3. Execute:
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=localhost\\SQLEXPRESS;Database=SeficPartnersDb;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True"
+  }
+}
+```
+
+2. Aplicar as migracoes:
 
 ```bash
-cd Sefic.Partners
-dotnet restore
-dotnet build
+dotnet ef database update --project Sefic.Partners.Shared --startup-project Sefic.Partners.Api
+```
+
+3. Executar a API:
+
+```bash
 dotnet run --project Sefic.Partners.Api
 ```
 
-Aceda ao Swagger em: `http://localhost:5000/swagger` ou na porta configurada pelo Kestrel.
-
 ---
 
-## 🧪 Testes Automatizados
+## 7. Testes Automatizados
 
-Foram implementados testes cobrindo rigorosamente todos os **7 cenários mínimos exigidos no enunciado**:
+A suite de testes de integracao e unidade cobre todos os cenarios exigidos:
 
-| Cenário | Descrição |
-|---|---|
-| **Cenário 1** | Criar com `" Ana Silva "` e `"001.234.567"`; normalização de nome e NIF; tentativa duplicada com `"001 234 567"` retorna 409; NIF continua reservado após desativação. |
-| **Cenário 2** | Entidade `BOTH` aparece nos filtros `CUSTOMER`, `SUPPLIER` e `BOTH`. Um `CUSTOMER` exclusivo não aparece no filtro `SUPPLIER`. |
-| **Cenário 3** | Desativação via `PUT` remove da listagem normal, mantém em `includeInactive=true` e acessível por ID; reativação restaura listagem padrão. |
-| **Cenário 4** | Atualização mantendo o próprio NIF é permitida. Mudar para NIF de outro parceiro devolve 409 e preserva dados originais. |
-| **Cenário 5** | Criações simultâneas com mesmo NIF: uma devolve 201 e outra 409 (apenas 1 registo na BD). Atualizações simultâneas com a mesma `Version`: uma devolve 200 e outra 409 (concorrência otimista via SQL Server). |
-| **Cenário 6** | `CreditLimit=10,999` e NIF com letras devolvem 400. `Page=0`, `Type` inválido e `Version` malformada devolvem 400 sem alterar a base de dados. |
-| **Cenário 7** | Filtros combinados, `TotalCount` calculado antes da paginação, desempate por `Id` para nomes iguais e `Search="Ana"` sem corresponder a todas as entidades pelo NIF. |
+- Validacao e normalizacao de NIF e Nome com remocao de espacos e pontuacao.
+- Reserva de NIF na base de dados mesmo apos desativacao.
+- Filtros por tipo de parceiro (CUSTOMER, SUPPLIER, BOTH).
+- Desativacao logica e reativacao via PUT.
+- Concorrencia otimista real com verificacao de conflitos via token Version.
+- Limite de credito com validacao estrita de casas decimais.
+- Paginacao com contagem previa (CountAsync) e metadados de navegacao.
+- Rota de carga inicial (SeedController).
 
-Para executar a suíte de testes:
+Para executar os testes:
 
 ```bash
-cd Sefic.Partners
-dotnet test
+dotnet test Sefic.Partners.Tests\Sefic.Partners.Tests.csproj
 ```
-
----
-
-## 📦 Dados de Exemplo (Seed Data)
-
-Para carregar dados de exemplo com diferentes tipos de clientes e fornecedores, utilize o script SQL disponível em:
-
-```
-Sefic.Partners/data/seed.sql
-```
-
-Pode executá-lo diretamente via `sqlcmd`, Azure Data Studio ou SQL Server Management Studio (SSMS).
-
----
-
-## 📄 Exemplos de Chamadas HTTP
-
-O ficheiro **`requests.http`** na raiz do projeto contém exemplos prontos para execução com extensões como REST Client (VS Code) ou HttpClient (Visual Studio / JetBrains Rider).

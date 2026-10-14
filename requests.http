@@ -1,6 +1,10 @@
 ### Sefic Partners API - Exemplos de Requisições HTTP
 
 @baseUrl = http://localhost:8080/api/partners
+@seedUrl = http://localhost:8080/api/seed
+
+### 0. Carregar Dados Iniciais (Seed) (POST /api/seed/carregarPartners)
+POST {{seedUrl}}/carregarPartners
 
 ### 1. Criar Cliente (POST /api/partners) - Sucesso 201
 # Note que os espaços e pontos no NIF e no Nome serão normalizados pelo servidor

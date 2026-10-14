@@ -69,9 +69,18 @@ namespace Sefic.Partners.Shared.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("IX_Partners_CreatedAt");
+
+                    b.HasIndex("Name")
+                        .HasDatabaseName("IX_Partners_Name");
+
                     b.HasIndex("TaxNumber")
                         .IsUnique()
                         .HasDatabaseName("IX_Partners_TaxNumber_Unique");
+
+                    b.HasIndex("IsActive", "CreatedAt")
+                        .HasDatabaseName("IX_Partners_IsActive_CreatedAt");
 
                     b.ToTable("Partners", (string)null);
                 });
