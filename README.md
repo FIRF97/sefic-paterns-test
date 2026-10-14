@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Sefic Partners API
 
 API RESTful para gestao de parceiros de negocio (clientes, fornecedores ou ambos) em ambiente de empresa unica. Desenvolvida em ASP.NET Core (.NET 9) com Entity Framework Core e Microsoft SQL Server, em conformidade com as especificacoes do documento 02-Fase-Pratica.pdf e com o padrao arquitetural em camadas do projeto de referencia ms-core-fundcube.
@@ -180,3 +181,7 @@ Para executar os testes:
 ```bash
 dotnet test Sefic.Partners.Tests\Sefic.Partners.Tests.csproj
 ```
+=======
+# sefic-paterns-test
+Teste Dev
+>>>>>>> 4c5ef35354e4ee2bd214baa8629af530b631dabb
